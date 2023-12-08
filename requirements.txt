@@ -1,0 +1,7 @@
+h3                  # geospatial indexing
+imbalanced-learn    # data balancing
+geopandas           # geospatial
+jupyterlab          # notebook
+pandas              # data frames
+plotly              # data visualization
+scikit-learn        # machine learning
