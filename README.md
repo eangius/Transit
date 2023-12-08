@@ -1,5 +1,5 @@
 # Transit Schedules
-<img src="images/scott-webb-Ms6bSWTcVkg-unsplash.jpg" width="100%" height="200px">
+<img src="images/scott-webb-Ms6bSWTcVkg-unsplash.jpg" width="100%">
 
 Using historical data for the City Of Winnipeg, this repository performs exploratory analysis to
 identify inefficiencies & in the city's transit system with regards to scheduled times. We
