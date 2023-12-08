@@ -8,7 +8,7 @@ bus stops.
 
 ## Getting Started
 ```sh
-pip install -r requirements.txt;       # download per project external libs
+pip install -r requirements.txt;       # download project external libraries
 env PYTHONPATH=${PWD} jupyter lab;     # launch interactive notebook environment
 ```
 
