@@ -2,9 +2,8 @@
 <img src="images/scott-webb-Ms6bSWTcVkg-unsplash.jpg" width="100%">
 
 Using historical data for the City Of Winnipeg, this repository performs exploratory analysis to
-identify inefficiencies & in the city's transit system with regards to scheduled times. We
-leverage these findings to then design a real-time bus tardiness prediction system for individual
-bus stops.
+identify inefficiencies in the city's transit system with regards to scheduled times. We leverage
+these findings to then design a real-time bus tardiness prediction system for individual bus stops.
 
 ## Getting Started
 ```sh
