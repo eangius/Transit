@@ -5,13 +5,13 @@ ABOUT: This module is responsible for downloading from web & loading
 into working memory sub-sets of datasets needed.
 """
 
+from source import settings
 
 # External libraries
 from pathlib import Path
 import pandas as pd
 import urllib.request
 import glob
-
 
 DATA_DIR = 'data'
 
@@ -30,18 +30,17 @@ def download_transit_history(out_dir: str = DATA_DIR, year: str = None, month: s
     return
 
 
-# Loads a collection of transit history zipped parts as a memory dataframe.
-# Must have been locally downloaded first. Removes unwanted columns to save memory.
-def load_transit_history(out_dir: str = DATA_DIR, year: str = None, month: str = None) -> pd.DataFrame:
-    df = pd.concat((
+# Loads a collection of transit history zipped parts as a memory geo dataframe.
+def load_transit_history(
+    out_dir: str = DATA_DIR,                # location of downloaded zip files.
+    year: str = None, month: str = None,    # parts to load.
+    frac: float = 1.0                       # option to sub-sample a fraction per part
+) -> pd.DataFrame:
+    return pd.concat((
         pd.read_csv(file, compression='zip', header=0, sep=',')
+            .sample(frac=frac, random_state=settings.get('random_seed'))
         for file in glob.glob(f"{out_dir}/on_time_performance_{year or '*'}_{month or '*'}.zip")
     ), ignore_index=True)
-    df.drop([
-        'Row ID',           # redundant since reindex
-        'Route Name',       # redundant from 'Route Number'
-    ], axis=1, inplace=True)
-    return df
 
 
 # Downloads road network from government of canada. This remains zip & includes en/fr
