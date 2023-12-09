@@ -3,6 +3,7 @@
 *.swp
 *.diff
 .coverage*
+.ipynb*
 
 # ENVIRONMENTS
 .idea
