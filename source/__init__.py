@@ -1,7 +1,9 @@
 #!usr/bin/env python
 
 
-DATA_DIR = 'data'
+PROJ_DIR = '..'
+DATA_DIR = f'{PROJ_DIR}/data'
+IMAGE_DIR = f'{PROJ_DIR}/images'
 
 # system wide settings.
 settings = {

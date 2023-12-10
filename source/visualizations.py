@@ -115,7 +115,7 @@ def plot_hot_zone_image_row(lbl: str, items: list):
     for i, cls in enumerate(items):
         ax[i].title.set_text(cls)
         ax[i].axis('off')
-        ax[i].imshow(mpimg.imread(f'../images/heatmap_{lbl}_{cls}.png'))
+        ax[i].imshow(mpimg.imread(f'{IMAGE_DIR}/heatmap_{lbl}_{cls}.png'))
 
     plt.subplots_adjust(wspace=0.05, hspace=0)
     plt.show()
