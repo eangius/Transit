@@ -8,8 +8,10 @@ bus stops.
 
 ### Resources Used
 * 🔢 [Transit Delays](https://data.winnipeg.ca/Transit/Transit-On-Time-Performance-Data-Archive/cymk-nyei/data_preview) - Primary data from City of Winnipeg
-* 🔢 [Road Network](https://open.canada.ca/data/en/dataset/3d282116-e556-400c-9306-ca1a3cada77f/resource/7e43999a-a432-46df-83f1-f5ddb88ccdc7) - Auxiliary data from Government of Canada
-* 🔢 [POIs](http://download.geofabrik.de/north-america/canada/manitoba.html) - Auxiliary data from Open Street Map
+* 🔢 [Road Network](https://open.canada.ca/data/en/dataset/3d282116-e556-400c-9306-ca1a3cada77f/resource/7e43999a-a432-46df-83f1-f5ddb88ccdc7) - Auxiliary data from Government of Canada to enrich bus stop info.
+* 🔢 [POIs](http://download.geofabrik.de/north-america/canada/manitoba.html) - Auxiliary data from Open Street Map to proxy as normalization of areas by type & density
+* 🔢 [~~Historical Weather Conditions~~]() - Auxiliary data to contextualize current driving conditions.
+* 🔢 [~~Traffic / Incidents / Construction~~]() - Auxiliary data to contextualize known delays.
 * 🛠️ [QGIS Editor](https://www.qgis.org/en/site/) - Mapping tool for exploration & data processing
 
 
