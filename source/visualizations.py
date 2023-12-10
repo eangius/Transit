@@ -5,8 +5,11 @@ ABOUT: specific plots & visuals used in the analysis to hide
 details from notebook.
 """
 
+from source import *
+
 # External libraries
 import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
 import pandas as pd
 import calendar
 from typing import *
@@ -95,10 +98,24 @@ def export_hot_zone(df: pd.DataFrame, fn_temporal: Callable = None):
             df_viz[df_viz['Scheduled Time'] == cls] \
                 .drop('Scheduled Time', axis=1) \
                 .groupby('Location').mean() \
-                .to_csv(f'data/locations_{cls}.tsv', sep=delim)
+                .to_csv(f'{DATA_DIR}/Historical/locations_{cls}.tsv', sep=delim)
     else:
         df_viz \
             .drop('Scheduled Time', axis=1) \
             .groupby('Location').mean() \
-            .to_csv('data/locations_all.tsv', sep=delim, index=True)
+            .to_csv(f'{DATA_DIR}/Historical/locations_all.tsv', sep=delim, index=True)
     return
+
+
+# Load previously computed heatmap images as a row.
+def plot_hot_zone_image_row(lbl: str, items: list):
+    fig, ax = plt.subplots(1, len(items))
+    fig.tight_layout()
+
+    for i, cls in enumerate(items):
+        ax[i].title.set_text(cls)
+        ax[i].axis('off')
+        ax[i].imshow(mpimg.imread(f'../images/heatmap_{lbl}_{cls}.png'))
+
+    plt.subplots_adjust(wspace=0.05, hspace=0)
+    plt.show()

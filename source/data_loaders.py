@@ -5,15 +5,13 @@ ABOUT: This module is responsible for downloading from web & loading
 into working memory sub-sets of datasets needed.
 """
 
-from source import settings
+from source import *
 
 # External libraries
 from pathlib import Path
 import pandas as pd
 import urllib.request
 import glob
-
-DATA_DIR = 'data'
 
 
 # Locally downloads specific time slice parts of this dataset. This is huge & dynamic
