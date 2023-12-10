@@ -28,7 +28,7 @@ def plot_timeseries(df: pd.DataFrame):
         df_viz['mean'] + df_viz['std'],
         color='b', alpha=.1
     )
-    plt.title('Daily Average & Standard Bus Arrival Deviation')
+    plt.title('')
     plt.xticks(rotation=90)
     plt.ylabel('minutes')
     plt.tight_layout()
