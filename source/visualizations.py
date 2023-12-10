@@ -108,7 +108,7 @@ def export_hot_zone(df: pd.DataFrame, fn_temporal: Callable = None):
 
 
 # Load previously computed heatmap images as a row.
-def plot_hot_zone_image_row(lbl: str, items: list):
+def plot_heatmap_img(lbl: str, items: list):
     fig, ax = plt.subplots(1, len(items))
     fig.tight_layout()
 
@@ -119,3 +119,4 @@ def plot_hot_zone_image_row(lbl: str, items: list):
 
     plt.subplots_adjust(wspace=0.05, hspace=0)
     plt.show()
+
