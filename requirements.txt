@@ -1,9 +1,9 @@
-geopandas           # geospatial
-h3                  # geospatial indexing
-imbalanced-learn    # data balancing
-jupyterlab          # notebook
-keras               # deep-lerning
-matplotlib          # data visualization
-pandas              # data frames
-scikit-learn        # machine learning
-scikeras            # integrate scikit-learn + keras
+h3                              # geospatial indexing
+imbalanced-learn                # data balancing
+jupyterlab                      # notebook
+keras                           # deep-lerning
+matplotlib                      # data visualization
+pandas                          # data frames
+scikit-learn                    # machine learning
+scikeras                        # integrate scikit-learn + keras
+shapely                         # geometries
