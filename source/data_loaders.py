@@ -41,6 +41,22 @@ def load_transit_history(
     ), ignore_index=True)
 
 
+# Adjusts types, removes irrelevant columns & empty rows.
+def clean_transit_history(df: pd.DataFrame) -> pd.DataFrame:
+    df.drop([
+        'Row ID',       # redundant since reindex
+        'Route Name',   # redundant from 'Route Number'
+        'Day Type',     # derivable from scheduled date
+    ], axis=1, inplace=True)
+    df.dropna(inplace=True)
+
+    df['Route Destination'] = df['Route Destination'].astype('category')
+    df['Stop Number'] = df['Stop Number'].astype('category')
+    df['Deviation'] = df['Deviation'] / 60  # [minutes] neg = late, pos = early
+    df['Scheduled Time'] = pd.to_datetime(df['Scheduled Time'], format='ISO8601')
+    return df
+
+
 # Downloads road network from government of canada. This remains zip & includes en/fr
 # versions of roads, junctions, entryways, etc. User filtering required.
 def download_manitoba_roadnetwork(out_dir: str = DATA_DIR):
