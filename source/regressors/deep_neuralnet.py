@@ -64,7 +64,7 @@ class LSTMRegressor(KerasRegressor):
             ]),
             validation_split=validation_split,
             loss='mean_squared_error',                     # regression
-            optimizer=kwargs.get('optimizer', 'rmsprop'),  # needed for cloning when in parallel
+            optimizer=kwargs.get('optimizer', 'rmsprop'),  # needed cloning in parallel
         )
         return
 
