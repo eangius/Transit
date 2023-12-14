@@ -1,9 +1,11 @@
-h3                              # geospatial indexing
-imbalanced-learn                # data balancing
-jupyterlab                      # notebook
-keras                           # deep-lerning
-matplotlib                      # data visualization
-pandas                          # data frames
-scikit-learn                    # machine learning
-scikeras                        # integrate scikit-learn + keras
-shapely                         # geometries
+h3                                          # geospatial indexing
+imbalanced-learn                            # data balancing
+jupyterlab                                  # notebook
+keras                                       # deep-lerning
+matplotlib                                  # data visualization
+pandas                                      # data frames
+tensorflow-macos; sys_platform=="darwin"    # deep learning with MacOS accelerated hardware
+tensorflow; sys_platform!="darwin"          # deep learning regular hardware
+scikit-learn                                # machine learning
+scikeras                                    # integrate scikit-learn + keras
+shapely                                     # geometries
