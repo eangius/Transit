@@ -69,3 +69,24 @@ del df, df_old, df_new
 #     ie: expand stop-id into spatial features (lookup)
 #     ie: expand trip#
 
+
+
+from source.regressors.deep_neuralnet import LSTMRegressor
+from sklearn.pipeline import Pipeline as ScikitPipeline
+from sklearn.preprocessing import StandardScaler
+
+random_state = 42
+verbose = True
+pipeline = ScikitPipeline(
+    verbose=verbose,
+    steps=[
+        ('scaler', StandardScaler()),
+        ('spatial', LSTMRegressor(
+            bidirectional=False,    # avoid leakage
+            mask_value=-1,          # flag padding
+            units=10,               # hyper-param
+            random_state=random_state,
+            verbose=verbose,
+        ))
+    ]
+)
