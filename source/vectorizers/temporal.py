@@ -95,11 +95,13 @@ class DateTimeVectorizer(FeatureUnion):
     @staticmethod
     def _cos_feature(period: int, fn: Callable):
         return FunctionTransformer(
-            lambda X: np.cos(np.array(list(map(fn, X))) / period * 2 * np.pi)
+            lambda X: np.cos(np.array(list(map(fn, X))) / period * 2 * np.pi),
+            check_inverse=False,
         )
 
     @staticmethod
     def _abs_feature():
         return FunctionTransformer(
-            lambda X: np.array([time.mktime(x.timetuple()) for x in X])
+            lambda X: np.array([time.mktime(x.timetuple()) for x in X]),
+            check_inverse=False,
         )
