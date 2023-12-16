@@ -5,14 +5,16 @@
 from source.vectorizers.frequential import ItemCountVectorizer
 
 # External libraries
+from shapely.geometry.point import Point
+from typing import Set
 import h3.api.numpy_int as h3
 import numpy as np
 
 
-class GeoVecorizer(ItemCountVectorizer):
+class GeoVectorizer(ItemCountVectorizer):
     """
-    Converts latitude & longitude point coordinates to a geospatial indexing scheme.
-    This is useful to quantize areas & model neighboring or hierarchical spatial
+    Converts shapely latitude & longitude point coordinates to a geospatial indexing
+    scheme. This is useful to quantize areas & model neighboring or hierarchical spatial
     relationships between them. Some relationships are 1:1 but others are 1:many, so
     resulting vectors denote occurrence counts of all train-time known areas. Any
     unrecognized area at inference time is ignored & vectorized as zero. Depending on
@@ -23,20 +25,22 @@ class GeoVecorizer(ItemCountVectorizer):
 
     def __init__(
         self,
-        resolution: int,        # hex cell size 0-15
-        steps: int = 1,         # neighbouring or up the hierarchy
-        geo_index: str = 'h3',  # geo indexing scheme
-        mode: str = None,       # mapping to 'cell', 'neighbor', 'parent', 'children'
-        **kwargs                # see ItemCountVectorizer inputs.
+        resolution: int,           # cell size of this area (range depends on scheme)
+        index_scheme: str = 'h3',  # geo indexing scheme
+        items: Set[str] = None,    # combo of 'cell', 'neighbor', 'parent' or 'children'.
+        offset: int = 1,           # neighbouring or hierarchical cells away from this
+        **kwargs                   # see ItemCountVectorizer inputs.
     ):
-        if self.indexing_scheme != 'h3':
+        if index_scheme != 'h3':
             # TODO: implement geohash, s2, ..
-            raise NotImplemented(f"Geo indexing schem {self.indexing_scheme} is not supported")
+            raise NotImplemented(
+                f"Unrecognized indexing schem {self.indexing_scheme}"
+            )
 
         self.resolution = resolution
-        self.steps = steps
-        self.mode = mode
-        self.geo_index = geo_index
+        self.items = items or {'cells'}
+        self.offset = offset
+        self.index_scheme = index_scheme
         super().__init__(**kwargs)
         return
 
@@ -46,23 +50,34 @@ class GeoVecorizer(ItemCountVectorizer):
     def transform(self, X, y=None):
         return super().transform(self._convert(X), y)
 
+    # approximate coordinates from area centroids
+    def inverse_transform(self, X):
+        return np.array([
+            h3.h3_to_geo(y) if y else self.out_of_vocab
+            for y in super().inverse_transform(X)
+        ])
+
     def _convert(self, X):
-        return np.array(
-            list(map(self._cells, X)) if self.mode == 'cells' else
-            list(map(self._neighbors, X)) if self.mode == 'neighbors' else
-            list(map(self._parents, X)) if self.mode == 'parents' else
-            list(map(self._children, X)) if self.mode == 'children' else
-            X  # identity
-        )
+        # accumulates item types into the same vector
+        items = []
+        if 'cells' in self.items:
+            items.extend(list(map(self._cells, X)))
+        if 'neighbors' in self.items:
+            items.extend(list(map(self._neighbors, X)))
+        if 'parents' in self.items:
+            items.extend(list(map(self._parents, X)))
+        if 'children' in self.items:
+            items.extend(list(map(self._children, X)))
+        return np.array(items).reshape(-1, 1)
 
-    def _cells(self, lat, lng):
-        return h3.geo_to_h3(lat, lng, self.resolution)
+    def _cells(self, geom: Point):
+        return h3.geo_to_h3(geom.y, geom.x, self.resolution)
 
-    def _neighbors(self, lat, lng):
-        return h3.hex_ring(self._cells(lat, lng), self.setps)
+    def _neighbors(self, geom: Point):
+        return h3.hex_ring(self._cells(geom), self.setps)
 
-    def _parents(self, lat, lng):
-        return h3.h3_to_parent(self._cells(lat, lng), self.resolution - self.steps)
+    def _parents(self, geom: Point):
+        return h3.h3_to_parent(self._cells(geom), self.resolution - self.offset)
 
-    def _children(self, lat, lng):
-        return h3.h3_to_children(self._cells(lat, lng), self.resolution - self.steps)
+    def _children(self, geom: Point):
+        return h3.h3_to_children(self._cells(geom), self.resolution + self.offset)
