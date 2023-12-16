@@ -6,11 +6,16 @@ from sklearn.preprocessing import FunctionTransformer
 from sklearn.pipeline import FeatureUnion
 from typing import Tuple, Callable
 import numpy as np
+import time
 
 
-# ABOUT: Trigonometrically normalize cyclical date-time attributes. This avoids
-# curse of high dimensionality from one-hot-encoding each of the parts.
 class DateTimeVectorizer(FeatureUnion):
+    """
+    Trigonometrically encodes cyclical date-time attributes proportional to each of
+    their weights. This reduces the curse of high dimensionality from one-hot-encoding
+    each of the parts. When weights are all zero, encoding is just a scaler denoting
+    seconds since unix epoch.
+    """
 
     def __init__(
         self,
@@ -22,6 +27,7 @@ class DateTimeVectorizer(FeatureUnion):
         microsec_weight: float = 1.0,
         **kwargs
     ):
+        
         # store for persistence
         self.month_weight = month_weight
         self.weekday_weight = weekday_weight
@@ -32,16 +38,30 @@ class DateTimeVectorizer(FeatureUnion):
 
         transformer_list = []
         transformer_weights = dict()
-        for weights, feats in [
-            self._build_feature("month", month_weight, 12, lambda dt: dt.month),
-            self._build_feature("weekday", weekday_weight, 7, lambda dt: dt.weekday()),
-            self._build_feature("hour", hour_weight, 24, lambda dt: dt.hour),
-            self._build_feature("minute", minute_weight, 60, lambda dt: dt.minute),
-            self._build_feature("second", second_weight, 60, lambda dt: dt.second),
-            self._build_feature("microsecond", microsec_weight, 1000000, lambda dt: dt.microsecond),
-        ]:
-            transformer_list.extend(feats)
-            transformer_weights.update(weights)
+
+        if all(
+            w == 0
+            for w in {
+                month_weight,
+                weekday_weight,
+                hour_weight,
+                second_weight,
+                minute_weight,
+            }
+        ):
+            transformer_list.append(("time_abs", self._abs_feature()))
+            transformer_weights = dict()
+        else:
+            for weights, feats in [
+                self._build_feature("month", month_weight, 12, lambda dt: dt.month),
+                self._build_feature("weekday", weekday_weight, 7, lambda dt: dt.weekday()),
+                self._build_feature("hour", hour_weight, 24, lambda dt: dt.hour),
+                self._build_feature("minute", minute_weight, 60, lambda dt: dt.minute),
+                self._build_feature("second", second_weight, 60, lambda dt: dt.second),
+                self._build_feature("microsecond", microsec_weight, 1000000, lambda dt: dt.microsecond),
+            ]:
+                transformer_list.extend(feats)
+                transformer_weights.update(weights)
 
         super().__init__(
             transformer_list=transformer_list,
@@ -68,11 +88,18 @@ class DateTimeVectorizer(FeatureUnion):
     @staticmethod
     def _sin_feature(period: int, fn: Callable):
         return FunctionTransformer(
-            lambda X: np.sin(np.array(list(map(fn, X))) / period * 2 * np.pi)
+            lambda X: np.sin(np.array(list(map(fn, X))) / period * 2 * np.pi),
+            check_inverse=False,
         )
 
     @staticmethod
     def _cos_feature(period: int, fn: Callable):
         return FunctionTransformer(
             lambda X: np.cos(np.array(list(map(fn, X))) / period * 2 * np.pi)
+        )
+
+    @staticmethod
+    def _abs_feature():
+        return FunctionTransformer(
+            lambda X: np.array([time.mktime(x.timetuple()) for x in X])
         )
