@@ -4,21 +4,22 @@
 # External libraries
 from sklearn.preprocessing import FunctionTransformer
 from sklearn.pipeline import FeatureUnion
+from collections.abc import Iterable
 from typing import Tuple, Callable
 import numpy as np
-import time
+import pandas as pd
 
 
 class DateTimeVectorizer(FeatureUnion):
     """
     Trigonometrically encodes cyclical date-time attributes proportional to each of
     their weights. This reduces the curse of high dimensionality from one-hot-encoding
-    each of the parts. When weights are all zero, encoding is just a scaler denoting
-    seconds since unix epoch.
+    each of the parts.
     """
 
     def __init__(
         self,
+        season_weight: float = 1.0,
         month_weight: float = 1.0,
         weekday_weight: float = 1.0,
         hour_weight: float = 1.0,
@@ -27,8 +28,7 @@ class DateTimeVectorizer(FeatureUnion):
         microsec_weight: float = 1.0,
         **kwargs
     ):
-        
-        # store for persistence
+        self.season_weight = season_weight
         self.month_weight = month_weight
         self.weekday_weight = weekday_weight
         self.hour_weight = hour_weight
@@ -38,40 +38,28 @@ class DateTimeVectorizer(FeatureUnion):
 
         transformer_list = []
         transformer_weights = dict()
-
-        if all(
-            w == 0
-            for w in {
-                month_weight,
-                weekday_weight,
-                hour_weight,
-                second_weight,
-                minute_weight,
-            }
-        ):
-            transformer_list.append(("time_abs", self._abs_feature()))
-            transformer_weights = dict()
-        else:
-            for weights, feats in [
-                self._build_feature("month", month_weight, 12, lambda dt: dt.month),
-                self._build_feature("weekday", weekday_weight, 7, lambda dt: dt.weekday()),
-                self._build_feature("hour", hour_weight, 24, lambda dt: dt.hour),
-                self._build_feature("minute", minute_weight, 60, lambda dt: dt.minute),
-                self._build_feature("second", second_weight, 60, lambda dt: dt.second),
-                self._build_feature("microsecond", microsec_weight, 1000000, lambda dt: dt.microsecond),
-            ]:
-                transformer_list.extend(feats)
-                transformer_weights.update(weights)
+        for weights, feats in [
+            self._build("season", season_weight, 4, lambda dt: (dt.month % 12 // 3) + 1),  # approx & hemisphere independent
+            self._build("month", month_weight, 12, lambda dt: dt.month),
+            self._build("weekday", weekday_weight, 7, lambda dt: dt.weekday),
+            self._build("hour", hour_weight, 24, lambda dt: dt.hour),
+            self._build("minute", minute_weight, 60, lambda dt: dt.minute),
+            self._build("second", second_weight, 60, lambda dt: dt.second),
+            self._build("microsecond", microsec_weight, 1000000, lambda dt: dt.microsecond),
+        ]:
+            transformer_list.extend(feats)
+            transformer_weights.update(weights)
 
         super().__init__(
             transformer_list=transformer_list,
             transformer_weights=transformer_weights,
             n_jobs=kwargs.get("n_jobs"),
             verbose=kwargs.get("verbose", False),
+            **kwargs
         )
 
     @staticmethod
-    def _build_feature(lbl: str, weight: float, period: int, fn: Callable) -> Tuple[dict, list]:
+    def _build(lbl: str, weight: float, period: int, fn: Callable) -> Tuple[dict, list]:
         weights = dict()
         features = []
         if weight != 0:
@@ -88,20 +76,27 @@ class DateTimeVectorizer(FeatureUnion):
     @staticmethod
     def _sin_feature(period: int, fn: Callable):
         return FunctionTransformer(
-            lambda X: np.sin(np.array(list(map(fn, X))) / period * 2 * np.pi),
+            lambda x: np.sin(2 * np.pi * DateTimeVectorizer._conv(x, fn) / period),
             check_inverse=False,
         )
 
     @staticmethod
     def _cos_feature(period: int, fn: Callable):
         return FunctionTransformer(
-            lambda X: np.cos(np.array(list(map(fn, X))) / period * 2 * np.pi),
+            lambda x: np.cos(2 * np.pi * DateTimeVectorizer._conv(x, fn) / period),
             check_inverse=False,
         )
 
+    # NOTE: numpy dates don't support extracting date parts!
+    # Also column transformer may pass in data frames which
+    # complicates shapes
     @staticmethod
-    def _abs_feature():
-        return FunctionTransformer(
-            lambda X: np.array([time.mktime(x.timetuple()) for x in X]),
-            check_inverse=False,
-        )
+    def _conv(x, fn: Callable):
+        if isinstance(x, Iterable):
+            conv = [fn(dt) for dt in pd.to_datetime(
+                x.values if isinstance(x, pd.DataFrame) else x
+            )]
+        else:
+            conv = fn(pd.to_datetime(x))
+
+        return np.array(conv)
