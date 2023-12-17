@@ -3,9 +3,11 @@
 
 # Internal libraries
 from source.vectorizers.frequential import ItemCountVectorizer
+from source import polymorphic_args
 
 # External libraries
 from shapely.geometry.point import Point
+from overrides import overrides
 from typing import Set
 import h3.api.numpy_int as h3
 import numpy as np
@@ -27,14 +29,14 @@ class GeoVectorizer(ItemCountVectorizer):
         self,
         resolution: int,           # cell size of this area (range depends on scheme)
         index_scheme: str = 'h3',  # geo indexing scheme
-        items: Set[str] = None,    # combo of 'cell', 'neighbor', 'parent' or 'children'.
+        items: Set[str] = None,    # combo of 'cells', 'neighbors', 'parents' or 'children'.
         offset: int = 1,           # neighbouring or hierarchical cells away from this
         **kwargs                   # see ItemCountVectorizer inputs.
     ):
         if index_scheme != 'h3':
             # TODO: implement geohash, s2, ..
             raise NotImplemented(
-                f"Unrecognized indexing schem {self.indexing_scheme}"
+                f"Unrecognized indexing schem {index_scheme}"
             )
 
         self.resolution = resolution
@@ -44,13 +46,28 @@ class GeoVectorizer(ItemCountVectorizer):
         super().__init__(**kwargs)
         return
 
+    @polymorphic_args
+    @overrides
     def fit(self, X, y=None):
-        return super().fit(self._convert(X), y)
+        X = self._convert(X)
+        super().fit(X, y)
+        return self
 
+    @polymorphic_args
+    @overrides
     def transform(self, X, y=None):
-        return super().transform(self._convert(X), y)
+        X = self._convert(X)
+        return super().transform(X, y)
+
+    @polymorphic_args
+    @overrides
+    def fit_transform(self, X, y=None):
+        X = self._convert(X)
+        return super().fit_transform(X, y)
 
     # approximate coordinates from area centroids
+    @polymorphic_args
+    @overrides
     def inverse_transform(self, X):
         return np.array([
             h3.h3_to_geo(y) if y else self.out_of_vocab
@@ -58,6 +75,7 @@ class GeoVectorizer(ItemCountVectorizer):
         ])
 
     def _convert(self, X):
+        X = X.ravel()
         # accumulates item types into the same vector
         items = []
         if 'cells' in self.items:

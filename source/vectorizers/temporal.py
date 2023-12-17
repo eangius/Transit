@@ -1,5 +1,6 @@
 #!usr/bin/env python
 
+from source import polymorphic_args
 
 # External libraries
 from sklearn.preprocessing import FunctionTransformer
@@ -76,14 +77,14 @@ class DateTimeVectorizer(FeatureUnion):
     @staticmethod
     def _sin_feature(period: int, fn: Callable):
         return FunctionTransformer(
-            lambda x: np.sin(2 * np.pi * DateTimeVectorizer._conv(x, fn) / period),
+            lambda X: np.sin(2 * np.pi * DateTimeVectorizer._convert(X, fn) / period),
             check_inverse=False,
         )
 
     @staticmethod
     def _cos_feature(period: int, fn: Callable):
         return FunctionTransformer(
-            lambda x: np.cos(2 * np.pi * DateTimeVectorizer._conv(x, fn) / period),
+            lambda X: np.cos(2 * np.pi * DateTimeVectorizer._convert(X, fn) / period),
             check_inverse=False,
         )
 
@@ -91,12 +92,12 @@ class DateTimeVectorizer(FeatureUnion):
     # Also column transformer may pass in data frames which
     # complicates shapes
     @staticmethod
-    def _conv(x, fn: Callable):
-        if isinstance(x, Iterable):
+    def _convert(X, fn: Callable):
+        if isinstance(X, Iterable):
             conv = [fn(dt) for dt in pd.to_datetime(
-                x.values if isinstance(x, pd.DataFrame) else x
+                X.values if isinstance(X, pd.DataFrame) else X
             )]
         else:
-            conv = fn(pd.to_datetime(x))
+            conv = fn(pd.to_datetime(X))
 
         return np.array(conv)
