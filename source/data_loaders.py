@@ -8,6 +8,7 @@ into working memory sub-sets of datasets needed.
 from source import *
 
 # External libraries
+from shapely import wkt
 from pathlib import Path
 import pandas as pd
 import urllib.request
@@ -50,10 +51,16 @@ def clean_transit_history(df: pd.DataFrame) -> pd.DataFrame:
     ], axis=1, inplace=True)
     df.dropna(inplace=True)
 
-    df['Route Destination'] = df['Route Destination'].astype('category')
+    # simplify & combine name & destination into directional routes
+    df['Route'] = df.apply(
+        lambda row: str(row['Route Number']) + "__" + str(row['Route Destination']), axis=1
+    ).astype('category')
+    df.drop(['Route Number', 'Route Destination'], axis=1, inplace=True)
+
     df['Stop Number'] = df['Stop Number'].astype('category')
     df['Deviation'] = df['Deviation'] / 60  # [minutes] neg = late, pos = early
     df['Scheduled Time'] = pd.to_datetime(df['Scheduled Time'], format='ISO8601')
+    df['Location'] = df['Location'].apply(lambda geom: wkt.loads(geom))
     return df
 
 
