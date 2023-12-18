@@ -32,4 +32,4 @@ class KerasRegressor(ABC, RealKerasRegressor):
     # needed for advanced pipelines
     @property
     def _estimator_type(self):
-        return "regessor"
+        return "regressor"
