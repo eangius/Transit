@@ -3,7 +3,6 @@
 
 # Internal libraries
 from source.ml.vectorizers.frequential import ItemCountVectorizer
-from source.ml import polymorphic_args
 
 # External libraries
 from shapely.geometry.point import Point
@@ -11,6 +10,7 @@ from overrides import overrides
 from typing import Set
 import h3.api.numpy_int as h3
 import numpy as np
+import pandas as pd
 
 
 class GeoVectorizer(ItemCountVectorizer):
@@ -46,37 +46,26 @@ class GeoVectorizer(ItemCountVectorizer):
         super().__init__(**kwargs)
         return
 
-    @polymorphic_args
-    @overrides
-    def fit(self, X, y=None):
-        X = self._convert(X)
-        super().fit(X, y)
-        return self
-
-    @polymorphic_args
     @overrides
     def transform(self, X, y=None):
         X = self._convert(X)
         return super().transform(X, y)
 
-    @polymorphic_args
     @overrides
     def fit_transform(self, X, y=None):
         X = self._convert(X)
         return super().fit_transform(X, y)
 
-    # approximate coordinates from area centroids
-    @polymorphic_args
     @overrides
     def inverse_transform(self, X):
         return np.array([
-            h3.h3_to_geo(y) if y else self.out_of_vocab
+            h3.h3_to_geo(y) if y else self.out_of_vocab  # approx to hash centroid
             for y in super().inverse_transform(X)
         ])
 
+    # accumulates item types into the same vector
     def _convert(self, X):
-        X = X.ravel()
-        # accumulates item types into the same vector
+        X = X.values.ravel() if isinstance(X, pd.DataFrame) else X
         items = []
         if 'cells' in self.items:
             items.extend(list(map(self._cells, X)))
@@ -86,10 +75,10 @@ class GeoVectorizer(ItemCountVectorizer):
             items.extend(list(map(self._parents, X)))
         if 'children' in self.items:
             items.extend(list(map(self._children, X)))
-        return np.array(items).reshape(-1, 1)
+        return np.array(items).reshape(-1, 1)  # for ItemCountVectorizer
 
     def _cells(self, geom: Point):
-        return h3.geo_to_h3(geom.y, geom.x, self.resolution)
+        return h3.geo_to_h3(geom.y, geom.x, self.resolution)  # lon/lat order
 
     def _neighbors(self, geom: Point):
         return h3.hex_ring(self._cells(geom), self.setps)
