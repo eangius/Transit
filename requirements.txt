@@ -13,3 +13,4 @@ scikit-learn                                # machine learning
 scikeras                                    # integrate scikit-learn + keras
 shapely                                     # geometries
 scipy                                       # misc
+xgboost                                     # gradient boosting

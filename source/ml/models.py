@@ -87,6 +87,7 @@ def build_base_model(verbose: bool = True) -> ScikitPipeline:
                 transformers=[
                     ("temporal", temporal_vectorizer, ["Scheduled Time"]),
                     ("spatial", spatial_vectorizer, ["Location"]),
+                    # <<dbg add RouteInfoVectorizer() on all columns!
                 ],
                 transformer_weights=None,
                 remainder='drop',   # ignore other columns
