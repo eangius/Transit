@@ -3,13 +3,14 @@
 # Internal libraries
 from source.ml.vectorizers.temporal import *
 from source.ml.vectorizers.spatial import *
+from source.ml.vectorizers.contextual import *
 from source.ml.regressors.recurrent import *
 from source.ml.samplers.data_balancers import *
 
 # External libraries
 from imblearn.pipeline import Pipeline as ImbalancePipeline
 from sklearn.pipeline import Pipeline as ScikitPipeline
-from sklearn.preprocessing import MaxAbsScaler
+from sklearn.preprocessing import RobustScaler
 from sklearn.compose import ColumnTransformer
 from sklearn.decomposition import TruncatedSVD
 from sklearn.metrics import mean_squared_error
@@ -51,10 +52,15 @@ def build_base_model(verbose: bool = True) -> ScikitPipeline:
                 binary=False,       # proxi bus schedule traffic & stop density
                 max_items=3000,     # cap dimensionality to top most frequent
             )),
-            ('scaler', MaxAbsScaler(copy=False)),  # scale ranges preserving sparsity
+            #dbg>> ('scaler', MaxAbsScaler(copy=False)),  # scale ranges preserving sparsity
         ],
         verbose=verbose,
     )
+
+    # Enrich observations with route & environment settings.
+    contextual_vectorizer = RouteInfoVectorizer()
+    # <<dbg should this be pre-trained from all data (at risk of leakage)
+    # & passed into the pipeline?
 
     # Feature select combining co-related ones
     dimensionality_reducer = 'passthrough'
@@ -67,17 +73,26 @@ def build_base_model(verbose: bool = True) -> ScikitPipeline:
     # <<dbg
 
     # Sequentially predict from current input & previous output.
-    output_estimator = RegressorChain(
-        base_estimator=XGBRegressor(
-            n_estimators=30,
-            eval_metric=mean_squared_error,  # punish big errors more than small ones
-            n_jobs=n_jobs,
-            random_state=random_state,
-            verbosity=int(verbose),
-        ),
-        order=[0],     # <<dbg single output for now
-        random_state=random_state,
-        verbose=verbose,
+    output_regressor = ScikitPipeline(
+        steps=[
+            ('scaler', RobustScaler(
+                with_centering=False,   # preserve sparsity
+                with_scaling=True,      # relative ranges
+                unit_variance=False,    # preserve outliers
+            )),
+            ('regressor', RegressorChain(
+                base_estimator=XGBRegressor(
+                    n_estimators=30,
+                    eval_metric=mean_squared_error,  # punish big errors more than small ones
+                    n_jobs=n_jobs,
+                    random_state=random_state,
+                    verbosity=int(verbose),
+                ),
+                order=[0],     # <<dbg single output for now
+                random_state=random_state,
+                verbose=verbose,
+            )),
+        ],
     )
 
     return ImbalancePipeline(
@@ -87,7 +102,7 @@ def build_base_model(verbose: bool = True) -> ScikitPipeline:
                 transformers=[
                     ("temporal", temporal_vectorizer, ["Scheduled Time"]),
                     ("spatial", spatial_vectorizer, ["Location"]),
-                    # <<dbg add RouteInfoVectorizer() on all columns!
+                    ('contextual', contextual_vectorizer, ["Scheduled Time", "Route", "Stop Number"]),
                 ],
                 transformer_weights=None,
                 remainder='drop',   # ignore other columns
@@ -95,7 +110,7 @@ def build_base_model(verbose: bool = True) -> ScikitPipeline:
                 n_jobs=n_jobs,
             )),
             ('reducer', dimensionality_reducer),
-            ('estimator', output_estimator),
+            ('estimator', output_regressor),
         ],
         verbose=verbose,
     )
