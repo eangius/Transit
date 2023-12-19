@@ -1,3 +1,4 @@
+cachetools                                  # caching lib
 geopy                                       # geospatial lib
 h3                                          # geospatial indexing
 imbalanced-learn                            # data balancing
@@ -7,10 +8,10 @@ matplotlib                                  # data visualization
 overrides                                   # python oo code correctness decorator
 pandas                                      # data frames
 pyproj                                      # geographic projections
-tensorflow-macos; sys_platform=="darwin"    # deep learning with MacOS accelerated hardware
-tensorflow; sys_platform!="darwin"          # deep learning regular hardware
 scikit-learn                                # machine learning
 scikeras                                    # integrate scikit-learn + keras
 shapely                                     # geometries
 scipy                                       # misc
+tensorflow-macos; sys_platform=="darwin"    # deep learning with MacOS accelerated hardware
+tensorflow; sys_platform!="darwin"          # deep learning regular hardware
 xgboost                                     # gradient boosting
