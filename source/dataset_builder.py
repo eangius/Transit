@@ -4,9 +4,7 @@
 
 # External libraries
 from typing import *
-from dataclasses import dataclass
 import pandas as pd
-import datetime
 
 
 # Chronologically splits time-series into train & test parts. Ensures
@@ -33,40 +31,6 @@ def dataset_splitter(
     df_test = df.iloc[split_idx:, :].reset_index()
 
     return df_train, df_test
-
-
-@dataclass
-class Trip:
-    name: str         # name name & direction
-    df: pd.DataFrame  # sequence of scheduled & deviation of stops
-
-
-# Groups observations as a collection of daily name trips
-# where each is the sequence of stop status
-# shape = (name, date, trips, stops, 2)
-def spatial_route_context(
-    df: pd.DataFrame,  # raw observations ["Scheduled Time", "Stop Number", "Deviation", "Route"]
-    offset: datetime.timedelta,
-) -> Iterable[Trip]:
-    result = []
-    for route_name, df_routes in df.groupby("Route"):
-        grouper_by_timegap = df_routes.groupby(
-            (df_routes["Scheduled Time"].diff() > offset).cumsum()
-        )
-
-        df_routes.drop("Route", axis=1, inplace=True)
-        df_routes.sort_values("Scheduled Time", inplace=True)
-        df_routes.set_index("Scheduled Time", inplace=True)
-
-        # TODO
-        # must still split out staggered busses on the same name
-        # knowing the routes stop ordering.
-
-        result.extend(
-            Trip(route_name, df_trip)
-            for _, df_trip in grouper_by_timegap
-        )
-    return result
 
 
 # Groups observations as a collection of daily name stops
