@@ -35,7 +35,7 @@ class RegressionBalancer(ScikitSampler):
     @overrides
     def _fit_resample(self, X, y):
         # classify output into a temporary target
-        y_cls = pd.DataFrame(y).apply(self.fn_classifier).astype('category')
+        y_cls = pd.Series(y).apply(self.fn_classifier).astype('category')
         sampling_dist = y_cls.value_counts().to_dict()
 
         # clone minority classes to match the majority
