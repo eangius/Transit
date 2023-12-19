@@ -35,6 +35,7 @@ class RegressionBalancer(ScikitSampler):
     @overrides
     def _fit_resample(self, X, y):
         # classify output into a temporary target
+        y = y.to_numpy().ravel()
         y_cls = pd.Series(y).apply(self.fn_classifier).astype('category')
         sampling_dist = y_cls.value_counts().to_dict()
 
