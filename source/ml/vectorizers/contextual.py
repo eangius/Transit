@@ -8,7 +8,6 @@ import warnings
 from overrides import overrides
 from cachetools import cached, LRUCache
 import numpy as np
-import pandas as pd
 import time
 
 
@@ -20,7 +19,7 @@ class RouteInfoVectorizer(ScikitVectorizer):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self._route_stops = None  # seq of stops per directional route
+        self._route_stops = dict()  # seq of stops per directional route
         return
 
     '''
@@ -51,7 +50,7 @@ class RouteInfoVectorizer(ScikitVectorizer):
 
         # directional route to sequence of stops
         self._route_stops = {
-            route: df_grp["Stop Number"].drop_duplicates().values.ravel()
+            route: df_grp["Stop Number"].drop_duplicates().to_numpy().ravel()
             for route, df_grp in df.groupby("Route", observed=True)
             if df_grp.shape[0] > 0
         }
@@ -86,8 +85,8 @@ class RouteInfoVectorizer(ScikitVectorizer):
         stops = self._route_stops.get(route_name, np.array([]))
         indices = np.where(stops == stop_num)[0]
         if indices.size == 0:
-            #warnings.warn(f"Stop {stop_num} not part of route '{route_name}'")
             return 0  # unrecognized. may need retraining
+
         if indices.size > 1:
             warnings.warn(
                 f"Only the first position of the {indices.size} found instances " +
