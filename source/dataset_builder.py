@@ -1,9 +1,8 @@
 #!usr/bin/env python
 
-# Internal libraries
-
 # External libraries
 from typing import *
+from datetime import timedelta
 import pandas as pd
 
 
@@ -33,9 +32,41 @@ def dataset_splitter(
     return df_train, df_test
 
 
-# Groups observations as a collection of daily name stops
-# where each is the history of trip status for each stop
-def temporal_route_context(
-    df_raw: pd.DataFrame,  # raw observations ["Scheduled Time", "Stop Number", "Deviation", "Route"]
-):
-    raise NotImplementedError
+# ABOUT:
+# -- takes a dataset of individual bus stop arrival times
+# -- groups data into individual routes to get stop sequence order
+# -- splits route observations into individual bus trips (based on threshold time gap)
+# -- adds deviation times of previous window number of stops (if available)
+# -- returns dataset of all observations
+def dataset_spatial_context(
+    df: pd.DataFrame,  # raw observations ["Scheduled Time", "Stop Number", "Deviation", "Route"]
+    window: int = 10,  # number of stops behind current to look back
+    pad: int = 0,      # value to set target deviations at start of route.
+) -> pd.DataFrame:
+    results = []
+
+    offset = timedelta(hours=2)
+    for route_name, df_route in df.groupby("Route", observed=False):
+        grouper_by_time_gap = df_route.groupby(
+            (df_route["Scheduled Time"].diff() > offset).cumsum(),
+            observed=True
+        )
+        results.extend(
+            pd.DataFrame([
+                {
+                    **{
+                        k: row[k]
+                        for k in {"Scheduled Time", "Route", "Stop Number", "Location"}
+                    },
+
+                    # add deviations of previous stops (if any)
+                    **{
+                        f"Deviation{i * -1}": df_trip["Deviation"].iloc[idx - i] if idx - i >= 0 else pad
+                        for i in reversed(range(window + 1))
+                    },
+                }
+                for idx, row in df_trip.reset_index(drop=True).iterrows()
+            ])
+            for _, df_trip in grouper_by_time_gap
+        )
+    return pd.concat(results)
