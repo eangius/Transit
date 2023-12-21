@@ -26,7 +26,8 @@ download_transit_history(year="2022")
 # This should be a fully continuous & resent slice to capture current behaviours,
 # preserve time-series chronology & maintain route sequence structure of stops.
 df = clean_transit_history(pd.concat((
-    load_transit_history(frac=1.0,  year="2023", month="10"),
+    load_transit_history(frac=1.0, year="2023", month="05"),
+    load_transit_history(frac=1.0, year="2023", month="06")
 ), ignore_index=True))
 
 # Prepare for time-series learning from past to predict the future. Contextualize
