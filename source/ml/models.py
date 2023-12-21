@@ -14,16 +14,25 @@ from sklearn.preprocessing import RobustScaler
 from sklearn.compose import ColumnTransformer
 from sklearn.decomposition import TruncatedSVD
 from sklearn.metrics import mean_squared_error
-from sklearn.multioutput import RegressorChain
 from functools import partial
 from xgboost import XGBRegressor
 import time
 
 
-# ABOUT: simple bagging regressor treating individual stops independent
-# from the route & transit network. Useful to benchmark performance &
-# rank importance.
-def build_base_model(verbose: bool = True) -> ScikitPipeline:
+# Simple regressor predicting the next bus arrival time for a given stop of a
+# directional route. In its basic form, model treats individual stops as isolated
+# observations from the rest of the transit network. Sequence interdependence between
+# previous stops & previous trips can be modeled respectively through the spatial &
+# temporal context windows assumed to be encoded in the input. While some additions,
+# updates & removal of routes & stops are tolerated at predict time (with diminishing
+# accuracy) the model was tuned to learn characteristics of real locations & would
+# need to be retrained periodically to capture structural or environmental changes.
+# This model is useful to benchmark performance & rank feature importance.
+def build_base_model(
+    verbose: bool = True,
+    spatial_window: int = 3,    # number of stops back to consider
+    temporal_window: int = 3,   # number of trips back to consider
+) -> ScikitPipeline:
     n_jobs = 1
     random_state = 42
 
@@ -36,7 +45,7 @@ def build_base_model(verbose: bool = True) -> ScikitPipeline:
         random_state=random_state,
     )
 
-    # Capture cyclical date signal
+    # Capture cyclical date signal.
     temporal_vectorizer = DateTimeVectorizer(
         second_weight=0.0,      # too precise, conserve dimensions
         microsec_weight=0.0,    # too precise, conserve dimensions
@@ -52,7 +61,6 @@ def build_base_model(verbose: bool = True) -> ScikitPipeline:
                 binary=False,       # proxi bus schedule traffic & stop density
                 max_items=3000,     # cap dimensionality to top most frequent
             )),
-            #dbg>> ('scaler', MaxAbsScaler(copy=False)),  # scale ranges preserving sparsity
         ],
         verbose=verbose,
     )
@@ -80,17 +88,12 @@ def build_base_model(verbose: bool = True) -> ScikitPipeline:
                 with_scaling=True,      # relative ranges
                 unit_variance=False,    # preserve outliers
             )),
-            ('regressor', RegressorChain(
-                base_estimator=XGBRegressor(
-                    n_estimators=30,
-                    eval_metric=mean_squared_error,  # punish big errors more than small ones
-                    n_jobs=n_jobs,
-                    random_state=random_state,
-                    verbosity=int(verbose),
-                ),
-                order=[0],     # <<dbg single output for now
+            ('regressor', XGBRegressor(
+                n_estimators=30,
+                eval_metric=mean_squared_error,  # punish big errors more than small ones
+                n_jobs=n_jobs,
                 random_state=random_state,
-                verbose=verbose,
+                verbosity=int(verbose),
             )),
         ],
     )
@@ -103,9 +106,10 @@ def build_base_model(verbose: bool = True) -> ScikitPipeline:
                     ("temporal", temporal_vectorizer, ["Scheduled Time"]),
                     ("spatial", spatial_vectorizer, ["Location"]),
                     ('contextual', contextual_vectorizer, ["Scheduled Time", "Route", "Stop Number"]),
+                    ('historical', 'passthrough', [f"Deviation-{i}" for i in reversed(range(1, spatial_window + 1))])
                 ],
                 transformer_weights=None,
-                remainder='drop',   # ignore other columns
+                remainder='drop',   # explicitly mask out all other columns
                 verbose=verbose,
                 n_jobs=n_jobs,
             )),
@@ -113,21 +117,6 @@ def build_base_model(verbose: bool = True) -> ScikitPipeline:
             ('estimator', output_regressor),
         ],
         verbose=verbose,
-    )
-
-
-def build_real_model(verbose: bool = True) -> ScikitPipeline:
-    return ScikitPipeline(
-        verbose=verbose,
-        steps=[
-            ('spatial', LSTMRegressor(
-                bidirectional=False,    # avoid leakage
-                mask_value=-1,          # flag padding
-                units=10,               # hyper-param
-                random_state=42,
-                verbose=verbose,
-            ))
-        ]
     )
 
 
