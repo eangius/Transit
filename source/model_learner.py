@@ -25,10 +25,9 @@ download_transit_history(year="2022")
 # Load a representative slice of historical bus-stop arrival time deviation data.
 # This should be a fully continuous & resent slice to capture current behaviours,
 # preserve time-series chronology & maintain route sequence structure of stops.
-df = clean_transit_history(pd.concat(
-    load_transit_history(frac=1.0,  year="2023", month="09"),
+df = clean_transit_history(pd.concat((
     load_transit_history(frac=1.0,  year="2023", month="10"),
-))
+), ignore_index=True))
 
 # Prepare for time-series learning from past to predict the future. Contextualize
 # observations with previous stop & trip status & subsample to speedup learning.
@@ -70,6 +69,7 @@ print(report_evaluation(model, X_learn, y_learn))
 # -- efficiently random sample learn / eval sets
 # -- enrich with road-network data at stop locations
 # -- implement RNN equivalent model
+# -- improve auto route detection via distance & timestamp
 
 
 # EXPERIMENT 1: DATA BALANCING EFFECTS

@@ -67,8 +67,6 @@ def build_base_model(
 
     # Enrich observations with route & environment settings.
     contextual_vectorizer = RouteInfoVectorizer()
-    # <<dbg should this be pre-trained from all data (at risk of leakage)
-    # & passed into the pipeline?
 
     # Feature select combining co-related ones
     dimensionality_reducer = 'passthrough'
