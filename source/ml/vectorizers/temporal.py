@@ -2,6 +2,7 @@
 
 
 # External libraries
+from joblib import wrap_non_picklable_objects
 from sklearn.preprocessing import FunctionTransformer
 from sklearn.pipeline import FeatureUnion
 from collections.abc import Iterable
@@ -76,7 +77,9 @@ class DateTimeVectorizer(FeatureUnion):
     @staticmethod
     def _sin_feature(period: int, fn: Callable):
         return FunctionTransformer(
-            func=lambda X: np.sin(2 * np.pi * DateTimeVectorizer._convert(X, fn) / period),
+            func=wrap_non_picklable_objects(
+                lambda X: np.sin(2 * np.pi * DateTimeVectorizer._convert(X, fn) / period)
+            ),
             feature_names_out='one-to-one',
             check_inverse=False,
         )
@@ -84,7 +87,9 @@ class DateTimeVectorizer(FeatureUnion):
     @staticmethod
     def _cos_feature(period: int, fn: Callable):
         return FunctionTransformer(
-            func=lambda X: np.cos(2 * np.pi * DateTimeVectorizer._convert(X, fn) / period),
+            func=wrap_non_picklable_objects(
+                lambda X: np.cos(2 * np.pi * DateTimeVectorizer._convert(X, fn) / period)
+            ),
             feature_names_out='one-to-one',
             check_inverse=False,
         )
