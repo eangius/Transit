@@ -1,20 +1,24 @@
 #!usr/bin/env python
 
 # Internal libraries
+from source import RUNTIME_DIR
+from source.ml.normalizers.sparsity import *
 from source.ml.vectorizers.temporal import *
 from source.ml.vectorizers.spatial import *
 from source.ml.vectorizers.contextual import *
-from source.ml.regressors.recurrent import *
 from source.ml.samplers.data_balancers import *
 
 # External libraries
+from joblib import wrap_non_picklable_objects
 from imblearn.pipeline import Pipeline as ImbalancePipeline
-from sklearn.pipeline import Pipeline as ScikitPipeline
-from sklearn.preprocessing import RobustScaler
 from sklearn.compose import ColumnTransformer
-from sklearn.decomposition import TruncatedSVD
-from sklearn.metrics import mean_squared_error
-from functools import partial
+from sklearn.ensemble import IsolationForest
+from sklearn.decomposition import TruncatedSVD, PCA
+from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.pipeline import Pipeline as ScikitPipeline, FeatureUnion
+from sklearn.preprocessing import RobustScaler, FunctionTransformer
+from sklego.meta import EstimatorTransformer
+from sklego.preprocessing import IdentityTransformer
 from xgboost import XGBRegressor
 import time
 
@@ -35,13 +39,16 @@ def build_base_model(
 ) -> ScikitPipeline:
     n_jobs = 1
     random_state = 42
+    cache = False
 
     # Auto balance labels (only at fit time) by tolerance ranges.
     output_sampler = RegressionBalancer(
-        sampling_mode="over",               # clone minority
-        fn_classifier=lambda deviation:
-            "late" if deviation < 0 else    # majority
-            "early",                        # rare
+        sampling_mode="over",                   # clone minority
+        fn_classifier=wrap_non_picklable_objects(
+            lambda deviation:
+                "late" if deviation < 0 else    # majority
+                "early"                         # rare
+        ),
         random_state=random_state,
     )
 
@@ -52,24 +59,33 @@ def build_base_model(
     )
 
     # Quantize coverage areas by usage frequency
-    spatial_vectorizer = ScikitPipeline(
-        steps=[
-            ('h3', GeoVectorizer(
-                index_scheme='h3',  # hexagons have consistent areas
-                items={'cells'},    # quantize locations without relations
-                resolution=9,       # 5-10% of 1km^2 to compromise cell volume
-                binary=False,       # proxi bus schedule traffic & stop density
-                max_items=3000,     # cap dimensionality to top most frequent
-            )),
-        ],
-        verbose=verbose,
+    spatial_vectorizer = GeoVectorizer(
+        index_scheme='h3',  # hexagons have consistent areas
+        items={'cells'},    # locations without relations
+        resolution=8,       # 37/73% km² cell area of pentagons & hexagons
+        binary=False,       # proxi bus schedule traffic & stop density
+        max_items=3000,     # cap dimensionality to top most frequent
     )
 
     # Enrich observations with route & environment settings.
     contextual_vectorizer = RouteInfoVectorizer()
 
+    # Enrich with anomaly signal treating sub-model as a transformer.
+    anomaly_vectorizer = EstimatorTransformer(
+        predict_func='predict',
+        estimator=IsolationForest(
+            n_estimators=100,
+            n_jobs=n_jobs,
+            random_state=random_state,
+            verbose=verbose,
+        )
+    )
+
     # Feature select combining co-related ones
-    dimensionality_reducer = 'passthrough'
+    dimensionality_reducer = PCA(
+        n_components=300,
+        random_state=random_state
+    )
     # TruncatedSVD(
     #     n_components=1000,
     #     n_iter=10,
@@ -78,22 +94,13 @@ def build_base_model(
     # )
     # <<dbg
 
-    # Sequentially predict from current input & previous output.
-    output_regressor = ScikitPipeline(
-        steps=[
-            ('scaler', RobustScaler(
-                with_centering=False,   # preserve sparsity
-                with_scaling=True,      # relative ranges
-                unit_variance=False,    # preserve outliers
-            )),
-            ('regressor', XGBRegressor(
-                n_estimators=30,
-                eval_metric=mean_squared_error,  # punish big errors more than small ones
-                n_jobs=n_jobs,
-                random_state=random_state,
-                verbosity=int(verbose),
-            )),
-        ],
+    # Predict deviation time
+    output_regressor = XGBRegressor(
+        n_estimators=30,
+        eval_metric=mean_squared_error,  # punish big errors more than small ones
+        n_jobs=n_jobs,
+        random_state=random_state,
+        verbosity=int(verbose),
     )
 
     return ImbalancePipeline(
@@ -101,8 +108,8 @@ def build_base_model(
             ('balancer', output_sampler),
             ('vectorizer', ColumnTransformer(
                 transformers=[
-                    ("temporal", temporal_vectorizer, ["Scheduled Time"]),
-                    ("spatial", spatial_vectorizer, ["Location"]),
+                    ('temporal', temporal_vectorizer, ["Scheduled Time"]),
+                    ('spatial', spatial_vectorizer, ["Location"]),
                     ('contextual', contextual_vectorizer, ["Scheduled Time", "Route", "Stop Number"]),
                     ('historical', 'passthrough', [f"Deviation-{i}" for i in reversed(range(1, spatial_window + 1))])
                 ],
@@ -111,23 +118,51 @@ def build_base_model(
                 verbose=verbose,
                 n_jobs=n_jobs,
             )),
+            # ('enricher', FeatureUnion(
+            #     transformer_list=[
+            #         #('identity', IdentityTransformer()),        # <<dbg looses get_feature_names_out() info!
+            #         ('outliers', anomaly_vectorizer),            # <<dbg may need reshaping?
+            #     ],
+            #     transformer_weights=None,
+            #     n_jobs=n_jobs,
+            #     verbose=verbose,
+            # )),
+            ('denser', DenseTransformer()),
+            ('scaler', RobustScaler(
+                with_centering=True,    # destroy sparsity
+                with_scaling=True,      # relative ranges
+                unit_variance=False,    # preserve outliers
+            )),
             ('reducer', dimensionality_reducer),
             ('estimator', output_regressor),
         ],
+        memory=f'{RUNTIME_DIR}/cache' if cache else None,
         verbose=verbose,
     )
 
 
 # Evaluates error & runtime of model inference against a given dataset.
 def report_evaluation(models: dict, X, y) -> str:
-    metric = partial(mean_squared_error, squared=False)  # root mean squared error
     pad = 10
-    result = f"{'MODEL':<{pad}}\t{'ERROR (min)':<{pad}}\tRUNTIME (sec)\n"
+    precision = 3
+    result = "\t".join([
+        f"{'MODEL':<{pad}}",
+        f"{'RMSE (min)':<{pad}}",
+        f"{'R2 (%)':<{pad}}",
+        f"RUNTIME (sec)\n"
+    ])
     for name, model in models.items():
         t1 = time.time()
         y_actual = model.predict(X)
         t2 = time.time()
-        error = metric(y.to_numpy(), y_actual)
-        result += f"{name:<{pad}}\t{round(error, 3):<{pad}}\t{round(t2 - t1, 3)}\n"
+        metric_rmse = round(mean_squared_error(y_actual, y.to_numpy(), squared=False), precision)
+        metric_r2 = round(r2_score(y_actual, y.to_numpy()) * 100, precision)  # should use adjusted r2
+        metric_runtime = round(t2 - t1, precision)
+        result += "\t".join([
+            f"{name:<{pad}}",
+            f"{metric_rmse:<{pad}}",
+            f"{metric_r2:<{pad}}",
+            f"{metric_runtime}\n"
+        ])
     result += f"n={X.shape[0]}\n"
     return result

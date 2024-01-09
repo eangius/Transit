@@ -27,14 +27,14 @@ download_transit_history(year="2022")
 # preserve time-series chronology & maintain route sequence structure of stops.
 df = clean_transit_history(pd.concat((
     load_transit_history(frac=1.0, year="2023", month="05"),
-    load_transit_history(frac=1.0, year="2023", month="06")
+    #load_transit_history(frac=1.0, year="2023", month="06")
 ), ignore_index=True))
 
 # Prepare for time-series learning from past to predict the future. Contextualize
 # observations with previous stop & trip status & subsample to speedup learning.
 df_learn, df_eval = dataset_splitter(df, column="Scheduled Time", test_frac=0.20, gap_frac=0.05)
-df_learn = dataset_spatial_context(df_learn).sample(n=400000, replace=False)
-df_eval = dataset_spatial_context(df_eval).sample(n=10000, replace=False)
+df_learn = dataset_spatial_context(df_learn[:100000])#.sample(n=400000, replace=False)
+df_eval = dataset_spatial_context(df_eval[:5000])#.sample(n=10000, replace=False)
 del df
 
 # Split input from output columns for test/train datasets. Goal is to predict
@@ -45,22 +45,22 @@ X_eval = df_eval.drop("Deviation0", axis=1, inplace=False)
 y_eval = df_eval["Deviation0"].to_frame()
 
 # Define & train a collection of models to benchmark against.
-model = {
+models = {
     "dummy": DummyRegressor(strategy="mean"),     # random chance noise
     "base": build_base_model(spatial_window=5),   # baseline via classical ml
 }
-model = {
+models = {
     name: model.fit(X_learn, y_learn)
-    for name, model in model.items()
+    for name, model in models.items()
 }
 
 # Evaluate all models against the blind evaluation set & open learning-set
 # to determine degree of noise, generalization & memorization.
 print("Evaluation Set: (over-fitting?)")
-print(report_evaluation(model, X_eval, y_eval))
+print(report_evaluation(models, X_eval, y_eval))
 
 print("Learning Set: (memorizing?)")
-print(report_evaluation(model, X_learn, y_learn))
+print(report_evaluation(models, X_learn, y_learn))
 
 # TODO:
 # -- implement trip history context window

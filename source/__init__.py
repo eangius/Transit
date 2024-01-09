@@ -13,6 +13,7 @@ import sklearn
 PROJ_DIR = os.path.realpath(os.path.join(os.path.dirname(__file__), '..'))
 DATA_DIR = os.path.join(PROJ_DIR, 'data')
 IMAGE_DIR = os.path.join(PROJ_DIR, 'images')
+RUNTIME_DIR = os.path.join(PROJ_DIR, 'runtime')
 
 # System wide settings.
 settings = {
