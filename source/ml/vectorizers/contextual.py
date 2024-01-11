@@ -1,12 +1,10 @@
 #!usr/bin/env python
 
-# Internal libraries
-from source.ml.vectorizers import ScikitVectorizer
-
 # External libraries
 import warnings
 from overrides import overrides
 from cachetools import cached, LRUCache
+from scikitlab.vectorizers import ScikitVectorizer
 import numpy as np
 import time
 

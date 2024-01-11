@@ -2,21 +2,21 @@
 
 # Internal libraries
 from source import RUNTIME_DIR
-from source.ml.normalizers.sparsity import *
-from source.ml.vectorizers.temporal import *
-from source.ml.vectorizers.spatial import *
 from source.ml.vectorizers.contextual import *
-from source.ml.samplers.data_balancers import *
 
 # External libraries
 from joblib import wrap_non_picklable_objects
+from scikitlab.samplers.data_balancer import RegressionBalancer
+from scikitlab.normalizers.sparsity import DenseTransformer
+from scikitlab.vectorizers.temporal import DateTimeVectorizer
+from scikitlab.vectorizers.spatial import GeoVectorizer
 from imblearn.pipeline import Pipeline as ImbalancePipeline
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import IsolationForest
-from sklearn.decomposition import TruncatedSVD, PCA
+from sklearn.decomposition import PCA
 from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.pipeline import Pipeline as ScikitPipeline, FeatureUnion
-from sklearn.preprocessing import RobustScaler, FunctionTransformer
+from sklearn.preprocessing import RobustScaler
 from sklego.meta import EstimatorTransformer
 from sklego.preprocessing import IdentityTransformer
 from xgboost import XGBRegressor
@@ -54,15 +54,17 @@ def build_base_model(
 
     # Capture cyclical date signal.
     temporal_vectorizer = DateTimeVectorizer(
-        second_weight=0.0,      # too precise, conserve dimensions
-        microsec_weight=0.0,    # too precise, conserve dimensions
+        weights={
+            attr: 1.0
+            for attr in {"season", "month", "weekday", "hour", "minute"}
+        },
     )
 
     # Quantize coverage areas by usage frequency
     spatial_vectorizer = GeoVectorizer(
+        resolution=8,       # 37/73% km² cell area of pentagons & hexagons
         index_scheme='h3',  # hexagons have consistent areas
         items={'cells'},    # locations without relations
-        resolution=8,       # 37/73% km² cell area of pentagons & hexagons
         binary=False,       # proxi bus schedule traffic & stop density
         max_items=3000,     # cap dimensionality to top most frequent
     )
@@ -83,16 +85,9 @@ def build_base_model(
 
     # Feature select combining co-related ones
     dimensionality_reducer = PCA(
-        n_components=300,
+        n_components=0.7,
         random_state=random_state
     )
-    # TruncatedSVD(
-    #     n_components=1000,
-    #     n_iter=10,
-    #     n_oversamples=20,
-    #     random_state=random_state,
-    # )
-    # <<dbg
 
     # Predict deviation time
     output_regressor = XGBRegressor(

@@ -8,7 +8,7 @@ from source.ml.models import *
 
 # External libraries
 from sklearn.dummy import DummyRegressor
-
+import pandas as pd
 
 # Configure pandas to not truncate (...) row & column displays.
 pd.set_option('display.max_rows', 200)
